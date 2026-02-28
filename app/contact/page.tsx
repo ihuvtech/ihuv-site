@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Contact",
+  description: "Contact IHUV Technologies via email or form (UI only).",
+};
+
 export default function Contact() {
   return (
     <main>

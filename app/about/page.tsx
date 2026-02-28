@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "About",
+  description: "Learn about IHUV Technologies and our roadmap.",
+};
 
 export default function About() {
   return (

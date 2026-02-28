@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Pricing",
+  description: "IHUV pricing plans: Free and Pro (coming soon).",
+};
 
 export default function Pricing() {
   return (
