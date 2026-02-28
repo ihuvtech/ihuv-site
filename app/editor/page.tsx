@@ -1,550 +1,277 @@
 "use client";
 
-import type { Metadata } from "next";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useMemo, useState } from "react";
 
-type Draft = {
-  name: string;
-  headline: string;
-  location: string;
-  email: string;
-  github: string;
-  linkedin: string;
-  about: string;
-  skills: string[];
-  projects: { name: string; desc: string; tags: string[] }[];
-  experience: { role: string; org: string; period: string; bullets: string[] }[];
-  education: { school: string; degree: string; period: string }[];
-};
+type PortfolioData = Record<string, any>;
 
-const STORAGE_KEY = "ihuv_portfolio_draft_v1";
+type ApiOkGet = { ok: true; username: string; data: PortfolioData };
+type ApiOkPost = { ok: true; key: string; url?: string };
+type ApiErr = { ok?: false; error: string; details?: string };
 
-const defaultDraft: Draft = {
-  name: "Your Name",
-  headline: "Software Engineer",
-  location: "City, Country",
-  email: "you@email.com",
-  github: "https://github.com/",
-  linkedin: "https://linkedin.com/",
-  about:
-    "Write 2–4 sentences about yourself. Mention what you build, your strengths, and what roles you’re seeking.",
-  skills: ["TypeScript", "React", "Next.js", "Node.js", "AWS"],
-  projects: [
-    {
-      name: "Project One",
-      desc: "A short description of what you built, who it helped, and the outcome.",
-      tags: ["Next.js", "UI"],
-    },
-  ],
-  experience: [
-    {
-      role: "Software Engineer",
-      org: "Company",
-      period: "2025 – Present",
-      bullets: [
-        "Built a feature that improved X by Y%",
-        "Optimized performance and improved developer velocity",
-      ],
-    },
-  ],
-  education: [
-    { school: "University", degree: "B.S. / M.S. Computer Science", period: "2023 – 2024" },
-  ],
-};
-
-function safeParseDraft(raw: string | null): Draft | null {
-  if (!raw) return null;
-  try {
-    const obj = JSON.parse(raw);
-    if (!obj || typeof obj !== "object") return null;
-    return obj as Draft;
-  } catch {
-    return null;
-  }
-}
-
-function toSlugList(text: string) {
-  return text
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
+type ApiGetResponse = ApiOkGet | ApiErr;
+type ApiPostResponse = ApiOkPost | ApiErr;
 
 export default function EditorPage() {
-  const router = useRouter();
+  const [username, setUsername] = useState("testuser6");
 
-  const [draft, setDraft] = useState<Draft>(defaultDraft);
+  // This is the editable portfolio JSON (as text)
+  const [jsonText, setJsonText] = useState(
+    JSON.stringify(
+      {
+        name: "Ravi",
+        title: "Software Engineer",
+      },
+      null,
+      2
+    )
+  );
 
-  // helper fields for "comma separated" inputs
-  const [skillsText, setSkillsText] = useState(defaultDraft.skills.join(", "));
+  const [loading, setLoading] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string>("");
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
-  // Load existing draft if present
-  useEffect(() => {
-    const saved = safeParseDraft(localStorage.getItem(STORAGE_KEY));
-    if (saved) {
-      setDraft(saved);
-      setSkillsText((saved.skills || []).join(", "));
+  // ✅ Option A: store curl strings in variables (avoids JSX parsing errors)
+  const CURL_POST = useMemo(() => {
+    return `curl -X POST http://localhost:3000/api/portfolio -H "Content-Type: application/json" -d '{"username":"${username}","data":{"name":"Ravi"}}'`;
+  }, [username]);
+
+  const CURL_GET = useMemo(() => {
+    return `curl http://localhost:3000/api/portfolio/${encodeURIComponent(username)}`;
+  }, [username]);
+
+  function safeParseJson(text: string): { ok: true; value: PortfolioData } | { ok: false; error: string } {
+    try {
+      const val = JSON.parse(text);
+      if (val === null || typeof val !== "object") {
+        return { ok: false, error: "JSON must be an object (example: {\"name\":\"Ravi\"})" };
+      }
+      return { ok: true, value: val };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || "Invalid JSON" };
     }
+  }
+
+  async function loadPortfolio(u?: string) {
+    const user = (u ?? username).trim();
+    setErrorMsg("");
+    setStatusMsg("");
+
+    if (!user) {
+      setErrorMsg("Please enter a username.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/portfolio/${encodeURIComponent(user)}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const json = (await res.json()) as ApiGetResponse;
+
+      if (!res.ok) {
+        // json may or may not include error, so we fallback safely
+        const msg = "error" in json ? json.error : `Failed to load (HTTP ${res.status})`;
+        setErrorMsg(msg);
+        return;
+      }
+
+      if ("ok" in json && json.ok) {
+        setUsername(json.username);
+        setJsonText(JSON.stringify(json.data ?? {}, null, 2));
+        setStatusMsg(`Loaded portfolio for "${json.username}".`);
+      } else {
+        setErrorMsg("Unexpected response while loading.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Load failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function savePortfolio() {
+    const user = username.trim();
+    setErrorMsg("");
+    setStatusMsg("");
+
+    if (!user) {
+      setErrorMsg("Please enter a username.");
+      return;
+    }
+
+    const parsed = safeParseJson(jsonText);
+    if (!parsed.ok) {
+      setErrorMsg(parsed.error);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/portfolio`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user, data: parsed.value }),
+      });
+
+      const json = (await res.json()) as ApiPostResponse;
+
+      if (!res.ok) {
+        const msg = "error" in json ? json.error : `Save failed (HTTP ${res.status})`;
+        const details = "details" in json && json.details ? ` — ${json.details}` : "";
+        setErrorMsg(msg + details);
+        return;
+      }
+
+      if ("ok" in json && json.ok) {
+        const extra = json.key ? ` Key: ${json.key}` : "";
+        setStatusMsg(`Saved portfolio for "${user}".${extra}`);
+      } else {
+        setErrorMsg("Unexpected response while saving.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Save failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Optional: auto-load once on open (comment out if you don’t want)
+  useEffect(() => {
+    // loadPortfolio(username);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Derived: show save status
-  const draftValid = useMemo(() => {
-    return (draft.name || "").trim().length > 0 && (draft.headline || "").trim().length > 0;
-  }, [draft.name, draft.headline]);
-
-  function saveDraft() {
-    const next: Draft = {
-      ...draft,
-      skills: toSlugList(skillsText),
-    };
-    setDraft(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }
-
-  function previewDraft() {
-    saveDraft();
-    router.push("/preview");
-  }
-
-  function resetDraft() {
-    localStorage.removeItem(STORAGE_KEY);
-    setDraft(defaultDraft);
-    setSkillsText(defaultDraft.skills.join(", "));
-  }
-
-  // Project editing helpers (single project UI, but supports multiple)
-  function updateProject(idx: number, patch: Partial<Draft["projects"][number]>) {
-    setDraft((d) => {
-      const copy = [...d.projects];
-      copy[idx] = { ...copy[idx], ...patch };
-      return { ...d, projects: copy };
-    });
-  }
-
-  function addProject() {
-    setDraft((d) => ({
-      ...d,
-      projects: [
-        ...d.projects,
-        { name: "New Project", desc: "Description...", tags: ["Tag"] },
-      ],
-    }));
-  }
-
-  function removeProject(idx: number) {
-    setDraft((d) => ({
-      ...d,
-      projects: d.projects.filter((_, i) => i !== idx),
-    }));
-  }
-
-  // Experience helpers
-  function updateExp(idx: number, patch: Partial<Draft["experience"][number]>) {
-    setDraft((d) => {
-      const copy = [...d.experience];
-      copy[idx] = { ...copy[idx], ...patch };
-      return { ...d, experience: copy };
-    });
-  }
-
-  function addExp() {
-    setDraft((d) => ({
-      ...d,
-      experience: [
-        ...d.experience,
-        { role: "Role", org: "Company", period: "Year – Year", bullets: ["Bullet 1", "Bullet 2"] },
-      ],
-    }));
-  }
-
-  function removeExp(idx: number) {
-    setDraft((d) => ({
-      ...d,
-      experience: d.experience.filter((_, i) => i !== idx),
-    }));
-  }
-
-  // Education helpers
-  function updateEdu(idx: number, patch: Partial<Draft["education"][number]>) {
-    setDraft((d) => {
-      const copy = [...d.education];
-      copy[idx] = { ...copy[idx], ...patch };
-      return { ...d, education: copy };
-    });
-  }
-
-  function addEdu() {
-    setDraft((d) => ({
-      ...d,
-      education: [...d.education, { school: "School", degree: "Degree", period: "Year – Year" }],
-    }));
-  }
-
-  function removeEdu(idx: number) {
-    setDraft((d) => ({
-      ...d,
-      education: d.education.filter((_, i) => i !== idx),
-    }));
-  }
-
   return (
-    <main>
-      {/* Header */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <div className="h-full w-full bg-gradient-to-b from-slate-50 to-white" />
-          <div className="pointer-events-none absolute left-1/2 top-[-140px] h-[340px] w-[340px] -translate-x-1/2 rounded-full bg-slate-200/60 blur-3xl" />
-          <div className="pointer-events-none absolute right-[-120px] top-[120px] h-[320px] w-[320px] rounded-full bg-indigo-200/50 blur-3xl" />
-          <div className="pointer-events-none absolute left-[-140px] top-[220px] h-[340px] w-[340px] rounded-full bg-sky-200/40 blur-3xl" />
+    <div style={{ maxWidth: 1000, margin: "0 auto", padding: 20, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto" }}>
+      <h1 style={{ marginBottom: 8 }}>Portfolio Editor</h1>
+      <p style={{ marginTop: 0, opacity: 0.8 }}>
+        Edit JSON and save it to Vercel Blob via <code>/api/portfolio</code>.
+      </p>
+
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
+        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontWeight: 600 }}>Username</span>
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="testuser6"
+            style={{
+              padding: "8px 10px",
+              border: "1px solid #ccc",
+              borderRadius: 6,
+              minWidth: 220,
+            }}
+          />
+        </label>
+
+        <button
+          onClick={() => loadPortfolio()}
+          disabled={loading}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 6,
+            border: "1px solid #ccc",
+            background: "white",
+            cursor: loading ? "not-allowed" : "pointer",
+          }}
+        >
+          {loading ? "Loading..." : "Load"}
+        </button>
+
+        <button
+          onClick={savePortfolio}
+          disabled={loading}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 6,
+            border: "1px solid #111",
+            background: "#111",
+            color: "white",
+            cursor: loading ? "not-allowed" : "pointer",
+          }}
+        >
+          {loading ? "Saving..." : "Save"}
+        </button>
+      </div>
+
+      {statusMsg ? (
+        <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: "#eef9f1", border: "1px solid #bfe7c9" }}>
+          ✅ {statusMsg}
+        </div>
+      ) : null}
+
+      {errorMsg ? (
+        <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: "#fff1f1", border: "1px solid #f3b6b6" }}>
+          ❌ {errorMsg}
+        </div>
+      ) : null}
+
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ marginBottom: 8 }}>Portfolio JSON</h2>
+          <button
+            onClick={() => {
+              const parsed = safeParseJson(jsonText);
+              if (!parsed.ok) {
+                setErrorMsg(parsed.error);
+                return;
+              }
+              setJsonText(JSON.stringify(parsed.value, null, 2));
+              setStatusMsg("Formatted JSON.");
+              setErrorMsg("");
+            }}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 6,
+              border: "1px solid #ccc",
+              background: "white",
+              cursor: "pointer",
+            }}
+          >
+            Format JSON
+          </button>
         </div>
 
-        <div className="mx-auto max-w-6xl px-6 pt-14 pb-8">
-          <div className="inline-flex items-center gap-2 rounded-full border bg-white/70 px-3 py-1 text-xs text-slate-700 backdrop-blur">
-            Editor · <span className="font-medium">Draft → Preview (no backend)</span>
-          </div>
+        <textarea
+          value={jsonText}
+          onChange={(e) => setJsonText(e.target.value)}
+          spellCheck={false}
+          style={{
+            width: "100%",
+            minHeight: 420,
+            padding: 12,
+            borderRadius: 8,
+            border: "1px solid #ccc",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+            fontSize: 13,
+            lineHeight: 1.45,
+          }}
+        />
+      </div>
 
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-900">
-            Portfolio Editor
-          </h1>
-          <p className="mt-3 max-w-2xl text-slate-600">
-            Edit your portfolio data here, then preview a premium template. Saving uses localStorage (frontend only).
-          </p>
+      <div style={{ marginTop: 16, padding: 12, borderRadius: 8, border: "1px solid #ddd", background: "#fafafa" }}>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Terminal test commands</div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={saveDraft}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
-            >
-              Save Draft
-            </button>
-
-            <button
-              type="button"
-              onClick={previewDraft}
-              className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-            >
-              Preview
-            </button>
-
-            <button
-              type="button"
-              onClick={resetDraft}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
-            >
-              Reset
-            </button>
-
-            <Link
-              href="/demo"
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
-            >
-              Demo
-            </Link>
-          </div>
-
-          {!draftValid && (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              Add at least a <b>Name</b> and <b>Headline</b> for best preview.
-            </div>
-          )}
+        <div style={{ marginTop: 6 }}>
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>POST (save)</div>
+          <code style={{ display: "block", padding: 10, borderRadius: 8, background: "#111", color: "white", overflowX: "auto" }}>
+            {CURL_POST}
+          </code>
         </div>
-      </section>
 
-      {/* Form */}
-      <section className="mx-auto max-w-6xl px-6 pb-16">
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* LEFT */}
-            <div className="space-y-6">
-              {/* Profile */}
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="text-sm font-semibold text-slate-900">Profile</div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                    placeholder="Full name"
-                    value={draft.name}
-                    onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                    placeholder="Headline (e.g., Frontend Engineer)"
-                    value={draft.headline}
-                    onChange={(e) => setDraft({ ...draft, headline: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                    placeholder="Location"
-                    value={draft.location}
-                    onChange={(e) => setDraft({ ...draft, location: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                    placeholder="Email"
-                    value={draft.email}
-                    onChange={(e) => setDraft({ ...draft, email: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                    placeholder="GitHub URL"
-                    value={draft.github}
-                    onChange={(e) => setDraft({ ...draft, github: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                    placeholder="LinkedIn URL"
-                    value={draft.linkedin}
-                    onChange={(e) => setDraft({ ...draft, linkedin: e.target.value })}
-                  />
-                </div>
-
-                <textarea
-                  className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                  placeholder="About (2–4 sentences)"
-                  rows={4}
-                  value={draft.about}
-                  onChange={(e) => setDraft({ ...draft, about: e.target.value })}
-                />
-              </div>
-
-              {/* Skills */}
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="text-sm font-semibold text-slate-900">Skills</div>
-                <div className="mt-2 text-sm text-slate-600">
-                  Comma separated (example: React, Next.js, AWS)
-                </div>
-                <input
-                  className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                  value={skillsText}
-                  onChange={(e) => setSkillsText(e.target.value)}
-                />
-              </div>
-
-              {/* Projects */}
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-900">Projects</div>
-                  <button
-                    type="button"
-                    onClick={addProject}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50"
-                  >
-                    + Add
-                  </button>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  {draft.projects.map((p, idx) => (
-                    <div key={idx} className="rounded-3xl border border-slate-200 p-5">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs font-semibold text-slate-500">
-                          Project {idx + 1}
-                        </div>
-                        {draft.projects.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeProject(idx)}
-                            className="text-xs font-medium text-red-700 hover:underline"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-
-                      <input
-                        className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                        placeholder="Project name"
-                        value={p.name}
-                        onChange={(e) => updateProject(idx, { name: e.target.value })}
-                      />
-
-                      <textarea
-                        className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                        placeholder="Project description"
-                        rows={3}
-                        value={p.desc}
-                        onChange={(e) => updateProject(idx, { desc: e.target.value })}
-                      />
-
-                      <input
-                        className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                        placeholder="Tags (comma separated)"
-                        value={p.tags.join(", ")}
-                        onChange={(e) =>
-                          updateProject(idx, { tags: toSlugList(e.target.value) })
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT */}
-            <div className="space-y-6">
-              {/* Experience */}
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-900">Experience</div>
-                  <button
-                    type="button"
-                    onClick={addExp}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50"
-                  >
-                    + Add
-                  </button>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  {draft.experience.map((e, idx) => (
-                    <div key={idx} className="rounded-3xl border border-slate-200 p-5">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs font-semibold text-slate-500">
-                          Experience {idx + 1}
-                        </div>
-                        {draft.experience.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeExp(idx)}
-                            className="text-xs font-medium text-red-700 hover:underline"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <input
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                          placeholder="Role"
-                          value={e.role}
-                          onChange={(ev) => updateExp(idx, { role: ev.target.value })}
-                        />
-                        <input
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                          placeholder="Company"
-                          value={e.org}
-                          onChange={(ev) => updateExp(idx, { org: ev.target.value })}
-                        />
-                        <input
-                          className="sm:col-span-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                          placeholder="Period (e.g., 2024 – 2025)"
-                          value={e.period}
-                          onChange={(ev) => updateExp(idx, { period: ev.target.value })}
-                        />
-                      </div>
-
-                      <textarea
-                        className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                        rows={4}
-                        placeholder={"Bullets (one per line)\nExample:\nImproved X by Y%\nBuilt feature Z"}
-                        value={e.bullets.join("\n")}
-                        onChange={(ev) =>
-                          updateExp(idx, {
-                            bullets: ev.target.value
-                              .split("\n")
-                              .map((b) => b.trim())
-                              .filter(Boolean),
-                          })
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Education */}
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-900">Education</div>
-                  <button
-                    type="button"
-                    onClick={addEdu}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50"
-                  >
-                    + Add
-                  </button>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  {draft.education.map((ed, idx) => (
-                    <div key={idx} className="rounded-3xl border border-slate-200 p-5">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs font-semibold text-slate-500">
-                          Education {idx + 1}
-                        </div>
-                        {draft.education.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeEdu(idx)}
-                            className="text-xs font-medium text-red-700 hover:underline"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <input
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                          placeholder="School"
-                          value={ed.school}
-                          onChange={(e) => updateEdu(idx, { school: e.target.value })}
-                        />
-                        <input
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                          placeholder="Degree"
-                          value={ed.degree}
-                          onChange={(e) => updateEdu(idx, { degree: e.target.value })}
-                        />
-                        <input
-                          className="sm:col-span-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-slate-200"
-                          placeholder="Period"
-                          value={ed.period}
-                          onChange={(e) => updateEdu(idx, { period: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action box */}
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
-                <div className="font-semibold text-slate-900">How preview works</div>
-                <div className="mt-2">
-                  Save Draft writes your data to <span className="font-medium text-slate-900">localStorage</span>.
-                  Preview reads it from <span className="font-medium text-slate-900">/preview</span>.
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={saveDraft}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
-                  >
-                    Save Draft
-                  </button>
-                  <button
-                    type="button"
-                    onClick={previewDraft}
-                    className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                  >
-                    Preview
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 text-xs text-slate-500">
-            Note: Later, after backend + auth, this data will save per user account and publish to /u/username.
-          </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>GET (load)</div>
+          <code style={{ display: "block", padding: 10, borderRadius: 8, background: "#111", color: "white", overflowX: "auto" }}>
+            {CURL_GET}
+          </code>
         </div>
-      </section>
-    </main>
+
+        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
+          Tip: open <code>/editor</code>, set username, edit JSON, click <b>Save</b>, then click <b>Load</b>.
+        </div>
+      </div>
+    </div>
   );
 }
