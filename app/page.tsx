@@ -39,6 +39,7 @@ export default function Home() {
             </Link>
           </div>
 
+          {/* Try a Portfolio */}
           <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6">
             <div className="text-sm font-medium text-slate-900">Try a Portfolio</div>
             <div className="mt-3 flex gap-3">
@@ -60,6 +61,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Features */}
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {[
               { title: "Portfolio Hosting", desc: "Clean pages under your username." },
@@ -74,6 +76,41 @@ export default function Home() {
                 <div className="mt-2 text-sm text-slate-600">{f.desc}</div>
               </div>
             ))}
+          </div>
+
+          {/* Demo Profiles */}
+          <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6">
+            <div className="text-sm font-medium text-slate-900">Demo profiles</div>
+            <p className="mt-1 text-sm text-slate-600">
+              Click any profile to see the portfolio template.
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-3 text-sm">
+              <a
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 hover:bg-slate-50"
+                href="/u/rvalluri"
+              >
+                /u/rvalluri
+              </a>
+              <a
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 hover:bg-slate-50"
+                href="/u/test"
+              >
+                /u/test
+              </a>
+              <a
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 hover:bg-slate-50"
+                href="/u/john"
+              >
+                /u/john
+              </a>
+              <a
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 hover:bg-slate-50"
+                href="/u/sarah"
+              >
+                /u/sarah
+              </a>
+            </div>
           </div>
         </section>
       </div>
