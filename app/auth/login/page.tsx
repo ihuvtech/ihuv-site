@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered");
@@ -44,6 +44,69 @@ export default function LoginPage() {
   };
 
   return (
+    <form onSubmit={handleSubmit} className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+      {registered && (
+        <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-600">
+          Account created! Please sign in.
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
+      <label className="text-sm font-medium text-slate-900">Email</label>
+      <input
+        type="email"
+        value={formData.email}
+        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+        required
+        className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+        placeholder="you@email.com"
+      />
+
+      <label className="mt-4 block text-sm font-medium text-slate-900">
+        Password
+      </label>
+      <input
+        type="password"
+        value={formData.password}
+        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+        required
+        className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+        placeholder="••••••••"
+      />
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="mt-6 w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
+      >
+        {loading ? "Signing in..." : "Sign in"}
+      </button>
+
+      <div className="mt-4 text-sm text-slate-600">
+        New here?{" "}
+        <Link className="font-medium text-slate-900 hover:underline" href="/auth/register">
+          Create an account
+        </Link>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+        Tip: You can still create a resume without signing in on{" "}
+        <Link className="font-medium text-slate-900 hover:underline" href="/resume">
+          /resume
+        </Link>
+        .
+      </div>
+    </form>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <main>
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10">
@@ -65,64 +128,9 @@ export default function LoginPage() {
               Sign in to edit and publish your portfolio.
             </p>
 
-            <form onSubmit={handleSubmit} className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-              {registered && (
-                <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-600">
-                  Account created! Please sign in.
-                </div>
-              )}
-
-              {error && (
-                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
-                  {error}
-                </div>
-              )}
-
-              <label className="text-sm font-medium text-slate-900">Email</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
-                placeholder="you@email.com"
-              />
-
-              <label className="mt-4 block text-sm font-medium text-slate-900">
-                Password
-              </label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
-                placeholder="••••••••"
-              />
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-6 w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
-              >
-                {loading ? "Signing in..." : "Sign in"}
-              </button>
-
-              <div className="mt-4 text-sm text-slate-600">
-                New here?{" "}
-                <Link className="font-medium text-slate-900 hover:underline" href="/auth/register">
-                  Create an account
-                </Link>
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
-                Tip: You can still create a resume without signing in on{" "}
-                <Link className="font-medium text-slate-900 hover:underline" href="/resume">
-                  /resume
-                </Link>
-                .
-              </div>
-            </form>
+            <Suspense fallback={<div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">Loading...</div>}>
+              <LoginForm />
+            </Suspense>
           </div>
         </div>
       </section>
