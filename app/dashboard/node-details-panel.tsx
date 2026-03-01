@@ -736,7 +736,7 @@ export function NodeDetailsPanel({ node, onClose }: NodeDetailsPanelProps) {
       <div className="p-4 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-[#1a1d28] z-10">
         <div className="flex items-center gap-2">
           <span className="text-xl">{node.data.icon as React.ReactNode}</span>
-          <h2 className="text-white text-base font-semibold">{node.data.label}</h2>
+          <h2 className="text-white text-base font-semibold">{node.data.label as React.ReactNode}</h2>
         </div>
         <button
           onClick={onClose}
