@@ -235,3 +235,18 @@ html {
   transform: translateY(-5px);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
 }
+
+/* Force curved corner on canvas - override ReactFlow styles */
+.canvas-curved-corner {
+  border-top-left-radius: 32px !important;
+  overflow: hidden !important;
+  clip-path: inset(0 0 0 0 round 32px 0 0 0);
+  -webkit-clip-path: inset(0 0 0 0 round 32px 0 0 0);
+}
+
+.canvas-curved-corner > *,
+.canvas-curved-corner .react-flow,
+.canvas-curved-corner .react-flow__renderer,
+.canvas-curved-corner .react-flow__viewport {
+  border-top-left-radius: 32px !important;
+}

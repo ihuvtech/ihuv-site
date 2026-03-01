@@ -43,23 +43,21 @@ function FlowCanvasInner({ username }: { username: string }) {
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const { fitView, setCenter } = useReactFlow();
   const hasLoadedFromStorage = useRef(false);
+  const isCentering = useRef(false);
   
   // Get initial viewport from sessionStorage before first render
   const getInitialViewport = () => {
     if (typeof window !== 'undefined') {
       const savedViewport = sessionStorage.getItem('flow-viewport');
-      console.log('Loading viewport from sessionStorage:', savedViewport);
       if (savedViewport) {
         try {
           const parsed = JSON.parse(savedViewport);
-          console.log('Parsed viewport:', parsed);
           return parsed;
         } catch (e) {
           console.error('Failed to parse viewport:', e);
         }
       }
     }
-    console.log('Using default viewport');
     return { x: 0, y: 0, zoom: 1 };
   };
   
@@ -70,12 +68,6 @@ function FlowCanvasInner({ username }: { username: string }) {
     const savedNodes = sessionStorage.getItem('flow-nodes');
     const savedEdges = sessionStorage.getItem('flow-edges');
     const savedNodeId = sessionStorage.getItem('flow-nodeId');
-    
-    console.log('Loading from sessionStorage on mount:', {
-      savedNodes: savedNodes ? JSON.parse(savedNodes) : null,
-      savedEdges: savedEdges ? JSON.parse(savedEdges) : null,
-      savedNodeId
-    });
     
     if (savedNodes && savedEdges) {
       const parsedNodes = JSON.parse(savedNodes);
@@ -91,27 +83,18 @@ function FlowCanvasInner({ username }: { username: string }) {
 
   // Save to sessionStorage whenever nodes or edges change
   useEffect(() => {
-    console.log('Save effect triggered:', { 
-      hasLoaded: hasLoadedFromStorage.current, 
-      nodesLength: nodes.length, 
-      edgesLength: edges.length
-    });
-    
     if (!hasLoadedFromStorage.current) {
-      console.log('Skipping save - not loaded yet');
       return;
     }
     
     if (nodes.length === 0 && edges.length === 0) {
       // If canvas is empty, clear nodes/edges but keep viewport
-      console.log('Canvas is empty - clearing nodes/edges only');
       sessionStorage.removeItem('flow-nodes');
       sessionStorage.removeItem('flow-edges');
       sessionStorage.removeItem('flow-nodeId');
       // Keep viewport so canvas position persists
     } else {
       // Save current state
-      console.log('Saving to sessionStorage:', { nodes, edges, nodeId });
       sessionStorage.setItem('flow-nodes', JSON.stringify(nodes));
       sessionStorage.setItem('flow-edges', JSON.stringify(edges));
       sessionStorage.setItem('flow-nodeId', nodeId.toString());
@@ -133,6 +116,7 @@ function FlowCanvasInner({ username }: { username: string }) {
   };
 
   const handleNodeSelect = (nodeType: string) => {
+    console.log('🎯 handleNodeSelect called:', nodeType);
     const nodeDefinition = nodeTypes.find((n) => n.type === nodeType);
     if (!nodeDefinition) return;
 
@@ -182,9 +166,16 @@ function FlowCanvasInner({ username }: { username: string }) {
 
     // Center on first node with smooth transition
     if (nodes.length === 0) {
-      setTimeout(() => {
-        setCenter(0, 0, { zoom: 1, duration: 800 });
-      }, 50);
+      isCentering.current = true;
+      // Use requestAnimationFrame to ensure the node is rendered first
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setCenter(0, 0, { zoom: 1, duration: 800 });
+          setTimeout(() => {
+            isCentering.current = false;
+          }, 850);
+        });
+      });
     }
   };
 
@@ -215,8 +206,6 @@ function FlowCanvasInner({ username }: { username: string }) {
 
   const handleDelete = () => {
     if (selectedNodeId) {
-      console.log('Delete triggered for node:', selectedNodeId);
-      
       // First, clear selection and close panel
       setSelectedNodeId(null);
       setSelectedNodeLabel(null);
@@ -276,6 +265,17 @@ function FlowCanvasInner({ username }: { username: string }) {
         ref={reactFlowWrapper}
         className="flex-1 h-full relative"
       >
+        {/* Dynamic Canvas Breadcrumb - Top Left */}
+        <div className="absolute top-4 left-6 z-10 flex items-center gap-2 text-sm text-gray-300">
+          <span className="font-medium">{username}</span>
+          {selectedNodeLabel && (
+            <>
+              <span className="text-gray-500">&gt;</span>
+              <span className="text-white">{selectedNodeLabel}</span>
+            </>
+          )}
+        </div>
+
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -285,8 +285,11 @@ function FlowCanvasInner({ username }: { username: string }) {
           onSelectionChange={onSelectionChange}
           onNodeDoubleClick={onNodeDoubleClick}
           onMoveEnd={(_, viewport) => {
+            // Don't save viewport during centering animation
+            if (isCentering.current) {
+              return;
+            }
             // Always save viewport position when user stops panning/zooming
-            console.log('Saving viewport:', viewport);
             sessionStorage.setItem('flow-viewport', JSON.stringify(viewport));
           }}
           nodeTypes={customNodeTypes}
@@ -295,23 +298,18 @@ function FlowCanvasInner({ username }: { username: string }) {
           minZoom={0.1}
           maxZoom={4}
           proOptions={{ hideAttribution: true }}
-          style={{ background: "#ffffff" }}
+          style={{ 
+            background: "#151821",
+            borderTopLeftRadius: "32px",
+            overflow: "hidden"
+          }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} color="#91919a" />
+          <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} color="#4b5563" />
         </ReactFlow>
 
-        {/* Workflow Name on Canvas - Top Left */}
-        <div className="absolute top-4 left-4 z-10 flex items-center gap-2 text-sm text-gray-600 pointer-events-none select-none">
-          <span className="text-teal-600">IHUV-Tech</span>
-          <span className="text-gray-400">&gt;</span>
-          <span className="text-gray-700">{username}</span>
-          {selectedNodeLabel && (
-            <>
-              <span className="text-gray-400">&gt;</span>
-              <span className="text-gray-700">{selectedNodeLabel}</span>
-            </>
-          )}
-        </div>
+
+
+
       </div>
 
       {/* Controls Panel - Bottom Left like MaxDome */}

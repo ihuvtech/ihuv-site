@@ -34,6 +34,9 @@ export function Header() {
           <Link className="hover:text-slate-900" href="/contact">
             Contact
           </Link>
+          <Link className="hover:text-slate-900" href="/code">
+            Code
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2">
