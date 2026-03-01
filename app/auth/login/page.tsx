@@ -1,12 +1,48 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Sign in",
-  description: "Sign in to manage your IHUV portfolio.",
-};
+import Link from "next/link";
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const registered = searchParams.get("registered");
+
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const result = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Invalid email or password");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch (err) {
+      setError("Something went wrong");
+      setLoading(false);
+    }
+  };
+
   return (
     <main>
       <section className="relative overflow-hidden">
@@ -19,19 +55,35 @@ export default function LoginPage() {
         <div className="mx-auto max-w-6xl px-6 pt-14 pb-10">
           <div className="mx-auto max-w-md">
             <div className="inline-flex items-center gap-2 rounded-full border bg-white/70 px-3 py-1 text-xs text-slate-700 backdrop-blur">
-              Sign in · <span className="font-medium">UI only for now</span>
+              Sign in · <span className="font-medium">Welcome back</span>
             </div>
 
             <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-900">
               Welcome back
             </h1>
             <p className="mt-2 text-slate-600">
-              Sign in to edit and publish your portfolio. (Backend coming later.)
+              Sign in to edit and publish your portfolio.
             </p>
 
-            <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+            <form onSubmit={handleSubmit} className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+              {registered && (
+                <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-600">
+                  Account created! Please sign in.
+                </div>
+              )}
+
+              {error && (
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+                  {error}
+                </div>
+              )}
+
               <label className="text-sm font-medium text-slate-900">Email</label>
               <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
                 placeholder="you@email.com"
               />
@@ -41,15 +93,19 @@ export default function LoginPage() {
               </label>
               <input
                 type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
                 placeholder="••••••••"
               />
 
               <button
-                type="button"
-                className="mt-6 w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+                type="submit"
+                disabled={loading}
+                className="mt-6 w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
               >
-                Sign in (Coming Soon)
+                {loading ? "Signing in..." : "Sign in"}
               </button>
 
               <div className="mt-4 text-sm text-slate-600">
@@ -66,7 +122,7 @@ export default function LoginPage() {
                 </Link>
                 .
               </div>
-            </div>
+            </form>
           </div>
         </div>
       </section>

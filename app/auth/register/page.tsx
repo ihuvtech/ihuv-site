@@ -1,12 +1,48 @@
+"use client";
+
 import type { Metadata } from "next";
 import Link from "next/link";
-
-export const metadata: Metadata = {
-  title: "Create account",
-  description: "Create an IHUV account to publish a portfolio.",
-};
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    username: "",
+  });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Registration failed");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/auth/login?registered=true");
+    } catch (err) {
+      setError("Something went wrong");
+      setLoading(false);
+    }
+  };
+
   return (
     <main>
       <section className="relative overflow-hidden">
@@ -19,19 +55,28 @@ export default function RegisterPage() {
         <div className="mx-auto max-w-6xl px-6 pt-14 pb-10">
           <div className="mx-auto max-w-md">
             <div className="inline-flex items-center gap-2 rounded-full border bg-white/70 px-3 py-1 text-xs text-slate-700 backdrop-blur">
-              Get started · <span className="font-medium">UI only for now</span>
+              Get started · <span className="font-medium">Create your account</span>
             </div>
 
             <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-900">
               Create your account
             </h1>
             <p className="mt-2 text-slate-600">
-              Sign up to edit and publish your portfolio. (Backend coming later.)
+              Sign up to edit and publish your portfolio.
             </p>
 
-            <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+            <form onSubmit={handleSubmit} className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+              {error && (
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+                  {error}
+                </div>
+              )}
+
               <label className="text-sm font-medium text-slate-900">Full name</label>
               <input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
                 placeholder="Your name"
               />
@@ -40,32 +85,48 @@ export default function RegisterPage() {
                 Email
               </label>
               <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
                 placeholder="you@email.com"
               />
 
               <label className="mt-4 block text-sm font-medium text-slate-900">
-                Phone (optional)
+                Username
               </label>
               <input
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                required
+                minLength={3}
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
-                placeholder="+1 (555) 555-5555"
+                placeholder="username"
               />
+              <p className="mt-1 text-xs text-slate-500">
+                Your portfolio will be at: /u/username
+              </p>
 
               <label className="mt-4 block text-sm font-medium text-slate-900">
                 Password
               </label>
               <input
                 type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+                minLength={6}
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
                 placeholder="••••••••"
               />
 
               <button
-                type="button"
-                className="mt-6 w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+                type="submit"
+                disabled={loading}
+                className="mt-6 w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
               >
-                Create account (Coming Soon)
+                {loading ? "Creating account..." : "Create account"}
               </button>
 
               <div className="mt-4 text-sm text-slate-600">
@@ -76,13 +137,13 @@ export default function RegisterPage() {
               </div>
 
               <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
-                Want a resume right now without signup? Use{" "}
+                Tip: You can still create a resume without signing in on{" "}
                 <Link className="font-medium text-slate-900 hover:underline" href="/resume">
                   /resume
                 </Link>
                 .
               </div>
-            </div>
+            </form>
           </div>
         </div>
       </section>

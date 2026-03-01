@@ -1,6 +1,8 @@
 import "./globals.css";
-import Link from "next/link";
 import type { Metadata } from "next";
+import { Providers } from "./providers";
+import { ConditionalHeader } from "./components/conditional-header";
+import { ConditionalFooter } from "./components/conditional-footer";
 
 export const metadata: Metadata = {
   title: {
@@ -19,78 +21,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur">
-          <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-sm font-semibold text-white">
-                I
-              </span>
-              <span className="text-sm font-semibold tracking-tight text-slate-900">
-                IHUV Technologies
-              </span>
-            </Link>
-
-            <nav className="hidden md:flex items-center gap-6 text-sm text-slate-600">
-              <Link className="hover:text-slate-900" href="/">Home</Link>
-              <Link className="hover:text-slate-900" href="/resume">Resume</Link>
-              <Link className="hover:text-slate-900" href="/pricing">Pricing</Link>
-              <Link className="hover:text-slate-900" href="/about">About</Link>
-              <Link className="hover:text-slate-900" href="/contact">Contact</Link>
-            </nav>
-
-            <div className="flex items-center gap-2">
-              <Link
-                href="/demo"
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
-              >
-                Demo
-              </Link>
-
-              <Link
-                href="/auth/login"
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
-              >
-                Sign in
-              </Link>
-
-              <Link
-                href="/auth/register"
-                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-              >
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </header>
+        <Providers>
+        <ConditionalHeader />
 
         {children}
 
-        <footer className="border-t border-slate-200 bg-white">
-          <div className="mx-auto max-w-6xl px-6 py-12">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">IHUV Technologies</div>
-                <div className="mt-1 text-sm text-slate-600">
-                  AI powered developer portfolios and career tools.
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-4 text-sm text-slate-600">
-                <Link className="hover:text-slate-900" href="/resume">Resume</Link>
-                <Link className="hover:text-slate-900" href="/pricing">Pricing</Link>
-                <Link className="hover:text-slate-900" href="/about">About</Link>
-                <Link className="hover:text-slate-900" href="/contact">Contact</Link>
-                <a className="hover:text-slate-900" href="mailto:ihuvtech@gmail.com">
-                  ihuvtech@gmail.com
-                </a>
-              </div>
-            </div>
-
-            <div className="mt-10 text-xs text-slate-500">
-              © 2026 IHUV Technologies. All rights reserved.
-            </div>
-          </div>
-        </footer>
+        <ConditionalFooter />
+        </Providers>
       </body>
     </html>
   );

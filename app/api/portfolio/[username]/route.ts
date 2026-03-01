@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { get } from "@vercel/blob";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ username: string }> } // ✅ params is Promise
+  { params }: { params: Promise<{ username: string }> }
 ) {
   try {
     const { username } = await params;
@@ -12,19 +12,30 @@ export async function GET(
       return NextResponse.json({ error: "username missing" }, { status: 400 });
     }
 
-    const key = `portfolios/${username}.json`;
+    const portfolio = await prisma.portfolio.findUnique({
+      where: { username },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+      },
+    });
 
-    const result = await get(key, { access: "private" }); // ✅ required
-
-    if (!result) {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
+    if (!portfolio) {
+      return NextResponse.json({ error: "Portfolio not found" }, { status: 404 });
     }
 
-    // ✅ Read JSON from the stream (private blobs cannot be fetched via blob.url directly)
-    const text = await new Response(result.stream).text();
-    const data = JSON.parse(text);
-
-    return NextResponse.json({ ok: true, username, data });
+    return NextResponse.json({
+      ok: true,
+      username: portfolio.username,
+      data: portfolio.data,
+      published: portfolio.published,
+      user: portfolio.user,
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: "Unable to read portfolio", details: err?.message },
