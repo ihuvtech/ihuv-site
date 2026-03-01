@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ error: "username missing" }, { status: 400 });
     }
 
-    const portfolio = await prisma.portfolio.findUnique({
+    const portfolios = await prisma.portfolio.findMany({
       where: { username },
       include: {
         user: {
@@ -25,16 +25,21 @@ export async function GET(
       },
     });
 
-    if (!portfolio) {
-      return NextResponse.json({ error: "Portfolio not found" }, { status: 404 });
+    if (!portfolios || portfolios.length === 0) {
+      return NextResponse.json({ error: "No portfolios found" }, { status: 404 });
     }
 
     return NextResponse.json({
       ok: true,
-      username: portfolio.username,
-      data: portfolio.data,
-      published: portfolio.published,
-      user: portfolio.user,
+      portfolios: portfolios.map(p => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        username: p.username,
+        data: p.data,
+        published: p.published,
+      })),
+      user: portfolios[0].user,
     });
   } catch (err: any) {
     return NextResponse.json(
